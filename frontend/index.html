@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VideoAgent.ai - Intelligent Video Insights</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <i class="fa-solid fa-brain brand-icon"></i>
+        <span>VideoAgent.ai</span>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-title">RECENT HISTORY</div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Input Header Bar -->
+      <div class="input-card">
+        <h2>Process Video or Audio</h2>
+        <div class="input-group">
+          <input type="text" id="urlInput" placeholder="Enter YouTube URL or file path..." />
+          <select id="langSelect">
+            <option value="english">English</option>
+            <option value="urdu">Urdu</option>
+            <option value="spanish">Spanish</option>
+            <option value="french">French</option>
+          </select>
+          <button id="processBtn" onclick="processVideo()">
+            <i class="fa-solid fa-gear"></i> Process
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading State Indicator -->
+      <div id="loadingContainer" class="loading-container hidden">
+        <div class="spinner"></div>
+        <p>Extracting audio, transcribing, and generating context... Please wait.</p>
+      </div>
+
+      <!-- Results Container (Horizontal Summary + Chat) -->
+      <div id="resultsContainer" class="results-container hidden">
+        <div class="video-header">
+          <h1 id="videoTitle">Video Title</h1>
+        </div>
+
+        <!-- Full-Width Horizontal Executive Summary Card -->
+        <div class="card summary-card-full">
+          <div class="card-header">
+            <i class="fa-solid fa-file-lines card-icon"></i>
+            <h3>Executive Summary</h3>
+          </div>
+          <div class="card-body" id="summaryText">Loading summary...</div>
+        </div>
+
+        <!-- Interactive RAG Chat Section -->
+        <div class="chat-card">
+          <div class="card-header">
+            <i class="fa-solid fa-comments card-icon"></i>
+            <h3>Ask Questions About This Video</h3>
+          </div>
+          <div class="chat-messages" id="chatMessages">
+            <div class="message system-msg">
+              <strong>AI Assistant:</strong> Hello! Ask me any detailed question about this video or transcript.
+            </div>
+          </div>
+          <div class="chat-input-container">
+            <input type="text" id="chatInput" placeholder="Ask anything about the video content..." onkeypress="handleKeyPress(event)" />
+            <button id="sendChatBtn" onclick="sendChatMessage()">
+              <i class="fa-solid fa-paper-plane"></i> Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>
