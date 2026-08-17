@@ -36,10 +36,8 @@ class ChatRequest(BaseModel):
 @app.post("/api/process")
 async def process_video(req: ProcessRequest):
     try:
-        # Execute processing pipeline
         results = main.run_pipeline(req.source, language=req.language)
 
-        # Store RAG chain reference and video metadata in session
         session_data["rag_chain"] = main.CURRENT_RAG_CHAIN
         session_data["video_title"] = results.get("title", "Unknown Title")
 
@@ -54,7 +52,7 @@ async def process_video(req: ProcessRequest):
         print("\n=== API PROCESS ERROR TRACE ===")
         traceback.print_exc()
         print("===============================\n")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/api/chat")

@@ -1,90 +1,40 @@
 import os
 import re
-import requests
 from pydub import AudioSegment
-
-DOWNLOAD_DIR = "downloads"
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+from youtube_transcript_api import YouTubeTranscriptApi
 
 
-def download_youtube_audio(url: str) -> str:
-    video_id = re.search(r"(?:v=|/)([\w-]{11})", url)
-    file_id = video_id.group(1) if video_id else "unknown"
+def extract_youtube_id(url: str) -> str:
+    pattern = r"(?:v=|\/|youtu\.be\/)([0-9A-Za-z_-]{11})"
+    match = re.search(pattern, url)
+    if match:
+        return match.group(1)
+    raise ValueError("Invalid YouTube URL")
 
-    return _download_via_piped(url, file_id)
 
+def get_youtube_transcript(url: str) -> str:
+    video_id = extract_youtube_id(url)
 
-def _download_via_piped(url: str, file_id: str) -> str:
-    piped_instances = [
-        "https://pipedapi.kavin.rocks",
-        "https://pipedapi.adminforge.de",
-        "https://api.piped.yt",
-    ]
-
-    vid_id = re.search(r"(?:v=|/)([\w-]{11})", url)
-    if not vid_id:
-        raise RuntimeError(f"Could not extract video ID from URL: {url}")
-    video_id_str = vid_id.group(1)
-
-    last_error = None
-    for instance in piped_instances:
+    try:
+        transcript_data = YouTubeTranscriptApi.get_transcript(
+            video_id, languages=["en", "ur", "hi", "es", "fr", "de", "pt", "ar"]
+        )
+        full_text = " ".join([item["text"] for item in transcript_data])
+        return full_text
+    except Exception:
         try:
-            api_url = f"{instance}/streams/{video_id_str}"
-            resp = requests.get(api_url, timeout=30)
-            resp.raise_for_status()
-            data = resp.json()
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            for t in transcript_list:
+                generated = t.translate("en")
+                full_text = " ".join([item["text"] for item in generated])
+                return full_text
+        except Exception:
+            pass
 
-            audio_streams = [
-                s for s in data.get("audioStreams", [])
-                if s.get("mimeType", "").startswith("audio/")
-            ]
-            if not audio_streams:
-                last_error = "No audio streams found"
-                continue
-
-            best = max(audio_streams, key=lambda s: s.get("bitrate", 0))
-            stream_url = best.get("url")
-            if not stream_url:
-                last_error = "No stream URL"
-                continue
-
-            print(f"Downloading audio from Piped ({instance})...")
-            dl_resp = requests.get(stream_url, stream=True, timeout=120, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            })
-            dl_resp.raise_for_status()
-
-            temp_path = os.path.join(DOWNLOAD_DIR, f"{file_id}_temp.m4a")
-            with open(temp_path, "wb") as f:
-                for chunk in dl_resp.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
-            wav_path = os.path.join(DOWNLOAD_DIR, f"{file_id}.wav")
-            audio = AudioSegment.from_file(temp_path)
-            audio = audio.set_channels(1).set_frame_rate(16000)
-            audio.export(wav_path, format="wav")
-
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
-
-            return wav_path
-
-        except Exception as e:
-            last_error = f"{instance}: {e}"
-            print(f"Piped instance {instance} failed: {e}")
-            continue
-
-    raise RuntimeError(f"All Piped instances failed. Last error: {last_error}")
-
-
-def convert_to_wav(input_path: str) -> str:
-    output_path = os.path.splitext(input_path)[0] + "_converted.wav"
-    audio = AudioSegment.from_file(input_path)
-    audio = audio.set_channels(1).set_frame_rate(16000)
-    audio.export(output_path, format="wav")
-    return output_path
+    raise RuntimeError(
+        "No transcript or subtitles available for this video. "
+        "Try a video that has captions enabled."
+    )
 
 
 def chunk_audio(wav_path: str, chunk_minutes: int = 2) -> list:
