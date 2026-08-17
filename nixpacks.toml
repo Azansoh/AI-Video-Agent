@@ -2,7 +2,7 @@
 nixPkgs = ["ffmpeg", "nodejs"]
 
 [phases.build]
-cmds = ["pip install -r requirements.txt"]
+cmds = ["pip install -r requirements.txt", "pip install --upgrade yt-dlp"]
 
 [phases.run]
 cmd = "uvicorn api:app --host 0.0.0.0 --port $PORT"
