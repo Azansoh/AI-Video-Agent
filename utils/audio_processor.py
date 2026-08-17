@@ -1,59 +1,16 @@
 import os
-import re
 import yt_dlp
 from pydub import AudioSegment
-from youtube_transcript_api import YouTubeTranscriptApi
 
 DOWNLOAD_DIR = "downloads"
-COOKIE_PATH = "/tmp/youtube_cookies.txt"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 
-def extract_youtube_id(url: str) -> str:
-    pattern = r"(?:v=|\/|youtu\.be\/)([0-9A-Za-z_-]{11})"
-    match = re.search(pattern, url)
-    if match:
-        return match.group(1)
-    raise ValueError("Invalid YouTube URL")
-
-
-def get_youtube_transcript(url: str) -> str:
-    video_id = extract_youtube_id(url)
-
-    try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-
-        try:
-            transcript = transcript_list.find_manually_created_transcript(
-                ["en", "ur", "hi", "es", "fr", "de", "pt", "ar"]
-            )
-        except Exception:
-            transcript = transcript_list.find_generated_transcript(
-                ["en", "ur", "hi", "es", "fr", "de", "pt", "ar"]
-            )
-
-        data = transcript.fetch()
-        return " ".join([item["text"] for item in data])
-    except Exception as e:
-        raise RuntimeError(f"No transcript available: {e}")
-
-
-def _setup_cookies():
-    cookies_content = os.getenv("YOUTUBE_COOKIES")
-    if cookies_content:
-        with open(COOKIE_PATH, "w") as f:
-            f.write(cookies_content)
-        print("YouTube cookies loaded from environment variable.")
-
-
 def download_youtube_audio(url: str) -> str:
-    _setup_cookies()
-
-    video_id = extract_youtube_id(url)
-    output_path = os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s")
+    output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
 
     ydl_opts = {
-        "format": "ba/ba*",
+        "format": "bestaudio/best",
         "outtmpl": output_path,
         "postprocessors": [
             {
@@ -63,17 +20,22 @@ def download_youtube_audio(url: str) -> str:
             }
         ],
         "quiet": True,
-        "no_warnings": True,
-        "geo_bypass": True,
     }
-
-    if os.path.exists(COOKIE_PATH):
-        ydl_opts["cookiefile"] = COOKIE_PATH
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
-        return filename
+
+    return filename
+
+
+def convert_to_wav(input_path: str) -> str:
+    """Convert any audio/video file to WAV format using pydub."""
+    output_path = os.path.splitext(input_path)[0] + "_converted.wav"
+    audio = AudioSegment.from_file(input_path)
+    audio = audio.set_channels(1).set_frame_rate(16000)
+    audio.export(output_path, format="wav")
+    return output_path
 
 
 def chunk_audio(wav_path: str, chunk_minutes: int = 2) -> list:
