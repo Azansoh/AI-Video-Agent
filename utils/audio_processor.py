@@ -16,25 +16,23 @@ def get_youtube_transcript(url: str) -> str:
     video_id = extract_youtube_id(url)
 
     try:
-        transcript_data = YouTubeTranscriptApi.get_transcript(
-            video_id, languages=["en", "ur", "hi", "es", "fr", "de", "pt", "ar"]
-        )
-        full_text = " ".join([item["text"] for item in transcript_data])
-        return full_text
-    except Exception:
-        try:
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-            for t in transcript_list:
-                generated = t.translate("en")
-                full_text = " ".join([item["text"] for item in generated])
-                return full_text
-        except Exception:
-            pass
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
 
-    raise RuntimeError(
-        "No transcript or subtitles available for this video. "
-        "Try a video that has captions enabled."
-    )
+        try:
+            transcript = transcript_list.find_manually_created_transcript(
+                ["en", "ur", "hi", "es", "fr", "de", "pt", "ar"]
+            )
+        except Exception:
+            transcript = transcript_list.find_generated_transcript(
+                ["en", "ur", "hi", "es", "fr", "de", "pt", "ar"]
+            )
+
+        data = transcript.fetch()
+        return " ".join([item["text"] for item in data])
+    except Exception as e:
+        raise RuntimeError(
+            f"No transcript available for this video. {e}"
+        )
 
 
 def chunk_audio(wav_path: str, chunk_minutes: int = 2) -> list:
