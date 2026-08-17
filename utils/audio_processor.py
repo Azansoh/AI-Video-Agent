@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 import yt_dlp
 from pydub import AudioSegment
@@ -8,12 +9,13 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 
 def download_youtube_audio(url: str) -> str:
-    output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
 
     try:
         return _download_via_cobalt(url)
-    except Exception as cobalt_err:
-        print(f"Cobalt API failed: {cobalt_err}, trying yt-dlp...")
+    except Exception as e:
+        print(f"Cobalt API failed: {e}")
+
+    output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
 
     ydl_opts = {
         "format": "bestaudio/best",
@@ -47,56 +49,89 @@ def download_youtube_audio(url: str) -> str:
             filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
             return filename
     except Exception as e:
-        raise RuntimeError(
-            f"Download failed: {e}\n"
-            "YouTube blocks downloads from cloud servers."
-        )
+        raise RuntimeError(f"Download failed: {e}")
+
+
+COBALT_INSTANCES = [
+    "https://api.cobalt.tools",
+    "https://cobalt-api.kwiatekmiki.com",
+]
 
 
 def _download_via_cobalt(url: str) -> str:
-    cobalt_url = "https://api.cobalt.tools/"
+    last_error = None
 
-    resp = requests.post(
-        cobalt_url,
-        json={
-            "url": url,
-            "downloadMode": "audio",
-            "audioFormat": "wav",
-        },
-        headers={
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        timeout=60,
-    )
+    for instance in COBALT_INSTANCES:
+        try:
+            resp = requests.post(
+                f"{instance}/",
+                json={
+                    "url": url,
+                    "downloadMode": "audio",
+                    "audioFormat": "mp3",
+                },
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                timeout=30,
+            )
+
+            if resp.status_code != 200:
+                last_error = f"HTTP {resp.status_code} from {instance}"
+                continue
+
+            try:
+                data = resp.json()
+            except ValueError:
+                last_error = f"Non-JSON response from {instance}"
+                continue
+
+            if data.get("status") == "error" or "error" in data:
+                err = data.get("error", data.get("status"))
+                last_error = f"Cobalt error: {err}"
+                continue
+
+            download_url = data.get("url")
+            if not download_url:
+                last_error = f"No download URL from {instance}"
+                continue
+
+            return _download_file(download_url, url)
+
+        except requests.RequestException as e:
+            last_error = f"Request failed for {instance}: {e}"
+            continue
+
+    raise RuntimeError(f"All Cobalt instances failed. Last error: {last_error}")
+
+
+def _download_file(download_url: str, original_url: str) -> str:
+    video_id = re.search(r"(?:v=|/)([\w-]{11})", original_url)
+    file_id = video_id.group(1) if video_id else str(hash(original_url) % 100000)
+    filename = os.path.join(DOWNLOAD_DIR, f"{file_id}.mp3")
+
+    resp = requests.get(download_url, stream=True, timeout=120)
     resp.raise_for_status()
-    data = resp.json()
-
-    if "error" in data:
-        raise RuntimeError(f"Cobalt error: {data['error'].get('code', data['error'])}")
-
-    download_url = data.get("url")
-    if not download_url:
-        raise RuntimeError("Cobalt returned no download URL")
-
-    filename = os.path.join(DOWNLOAD_DIR, f"cobalt_audio_{hash(url) % 100000}.wav")
-
-    dl_resp = requests.get(download_url, stream=True, timeout=120)
-    dl_resp.raise_for_status()
 
     with open(filename, "wb") as f:
-        for chunk in dl_resp.iter_content(chunk_size=8192):
+        for chunk in resp.iter_content(chunk_size=8192):
             f.write(chunk)
 
-    converted = os.path.splitext(filename)[0] + ".wav"
-    if filename != converted:
-        os.rename(filename, converted)
+    wav_path = os.path.splitext(filename)[0] + ".wav"
+    audio = AudioSegment.from_file(filename)
+    audio = audio.set_channels(1).set_frame_rate(16000)
+    audio.export(wav_path, format="wav")
 
-    return converted
+    try:
+        os.remove(filename)
+    except OSError:
+        pass
+
+    return wav_path
 
 
 def convert_to_wav(input_path: str) -> str:
-    """Convert any audio/video file to WAV format using pydub."""
     output_path = os.path.splitext(input_path)[0] + "_converted.wav"
     audio = AudioSegment.from_file(input_path)
     audio = audio.set_channels(1).set_frame_rate(16000)
@@ -118,5 +153,3 @@ def chunk_audio(wav_path: str, chunk_minutes: int = 2) -> list:
         chunks.append(chunk_path)
 
     return chunks
-
-
