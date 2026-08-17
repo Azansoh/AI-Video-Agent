@@ -9,32 +9,40 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 def download_youtube_audio(url: str) -> str:
     output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
 
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": output_path,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["web"],
-            }
-        },
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "wav",
-                "preferredquality": "192",
-            }
-        ],
-        "quiet": True,
-    }
+    clients = ["tv", "tv_embedded", "mediaconnect", "web"]
+    last_error = None
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
-    except Exception as e:
-        raise RuntimeError(f"yt-dlp download failed: {e}")
+    for client in clients:
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "outtmpl": output_path,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": [client],
+                }
+            },
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "wav",
+                    "preferredquality": "192",
+                }
+            ],
+            "quiet": True,
+            "no_warnings": True,
+            "geo_bypass": True,
+        }
 
-    return filename
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
+                return filename
+        except Exception as e:
+            last_error = e
+            continue
+
+    raise RuntimeError(f"All yt-dlp clients failed. Last error: {last_error}")
 
 
 def convert_to_wav(input_path: str) -> str:
