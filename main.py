@@ -2,7 +2,7 @@ import os
 import re
 import traceback
 from dotenv import load_dotenv
-from utils.audio_processor import chunk_audio, get_youtube_transcript, extract_youtube_id
+from utils.audio_processor import chunk_audio, get_youtube_transcript, download_youtube_audio, extract_youtube_id
 from core.transcriber import transcribe_all
 from core.summarize import summarize, generate_title
 from core.extractor import extract_action_items, extract_decisions, extract_questions
@@ -28,10 +28,24 @@ def run_pipeline(source: str, language: str = "english") -> dict:
         if source.startswith("www."):
             source = "https://" + source
 
-        print(f"Step 0: Fetching transcript from YouTube... ({source})")
-        transcript = get_youtube_transcript(source)
+        transcript = None
 
-        print(f"Step 1: Generating title...")
+        print(f"Step 0: Trying transcript API... ({source})")
+        try:
+            transcript = get_youtube_transcript(source)
+            print("Transcript fetched successfully via API.")
+        except Exception as e:
+            print(f"Transcript API failed: {e}")
+
+        if not transcript:
+            print("Step 0b: No captions found. Downloading audio with yt-dlp + cookies...")
+            audio_file = download_youtube_audio(source)
+            print(f"Step 1: Chunking audio from '{audio_file}'...")
+            audio_chunks = chunk_audio(audio_file)
+            print("Step 2: Transcribing audio with Whisper...")
+            transcript = transcribe_all(audio_chunks, language=language)
+
+        print("Step 3: Generating title...")
         title = generate_title(transcript)
     else:
         if not os.path.exists(source):

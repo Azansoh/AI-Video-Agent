@@ -1,7 +1,12 @@
 import os
 import re
+import yt_dlp
 from pydub import AudioSegment
 from youtube_transcript_api import YouTubeTranscriptApi
+
+DOWNLOAD_DIR = "downloads"
+COOKIE_PATH = "/tmp/youtube_cookies.txt"
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 
 def extract_youtube_id(url: str) -> str:
@@ -30,9 +35,45 @@ def get_youtube_transcript(url: str) -> str:
         data = transcript.fetch()
         return " ".join([item["text"] for item in data])
     except Exception as e:
-        raise RuntimeError(
-            f"No transcript available for this video. {e}"
-        )
+        raise RuntimeError(f"No transcript available: {e}")
+
+
+def _setup_cookies():
+    cookies_content = os.getenv("YOUTUBE_COOKIES")
+    if cookies_content:
+        with open(COOKIE_PATH, "w") as f:
+            f.write(cookies_content)
+        print("YouTube cookies loaded from environment variable.")
+
+
+def download_youtube_audio(url: str) -> str:
+    _setup_cookies()
+
+    video_id = extract_youtube_id(url)
+    output_path = os.path.join(DOWNLOAD_DIR, f"{video_id}.%(ext)s")
+
+    ydl_opts = {
+        "format": "ba/ba*",
+        "outtmpl": output_path,
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "wav",
+                "preferredquality": "192",
+            }
+        ],
+        "quiet": True,
+        "no_warnings": True,
+        "geo_bypass": True,
+    }
+
+    if os.path.exists(COOKIE_PATH):
+        ydl_opts["cookiefile"] = COOKIE_PATH
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
+        return filename
 
 
 def chunk_audio(wav_path: str, chunk_minutes: int = 2) -> list:
