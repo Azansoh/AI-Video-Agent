@@ -27,9 +27,12 @@ def download_youtube_audio(url: str) -> str:
         "quiet": True,
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
+    except Exception as e:
+        raise RuntimeError(f"yt-dlp download failed: {e}")
 
     return filename
 
