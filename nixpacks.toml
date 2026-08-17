@@ -1,8 +1,8 @@
 [phases.setup]
-nixPkgs = ["ffmpeg", "nodejs"]
+nixPkgs = ["ffmpeg"]
 
 [phases.build]
-cmds = ["pip install -r requirements.txt", "pip install --upgrade yt-dlp"]
+cmds = ["pip install -r requirements.txt"]
 
 [phases.run]
 cmd = "uvicorn api:app --host 0.0.0.0 --port $PORT"
