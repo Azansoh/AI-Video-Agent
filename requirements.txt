@@ -1,14 +1,10 @@
-streamlit>=1.40.0
 python-dotenv>=1.0.1
-
 
 yt-dlp>=2024.08.06
 ffmpeg-python>=0.2.0
 pydub>=0.25.1
 
-openai-whisper
-torch
-torchaudio
+faster-whisper>=1.0.0
 
 deep-translator>=1.11.4
 
@@ -26,7 +22,6 @@ langchain-chroma>=1.0.0
 langchain-huggingface>=1.0.0
 sentence-transformers>=3.0.0
 huggingface-hub
-transformers
 
 reportlab>=4.2.0
 
