@@ -9,40 +9,43 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 def download_youtube_audio(url: str) -> str:
     output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
 
-    clients = ["tv", "tv_embedded", "mediaconnect", "web"]
-    last_error = None
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "outtmpl": output_path,
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "wav",
+                "preferredquality": "192",
+            }
+        ],
+        "quiet": True,
+        "no_warnings": True,
+        "geo_bypass": True,
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://www.youtube.com/",
+        },
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["web_creator"],
+                "player_skip": ["webpage", "configs"],
+            }
+        },
+    }
 
-    for client in clients:
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "outtmpl": output_path,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": [client],
-                }
-            },
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "wav",
-                    "preferredquality": "192",
-                }
-            ],
-            "quiet": True,
-            "no_warnings": True,
-            "geo_bypass": True,
-        }
-
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
-                return filename
-        except Exception as e:
-            last_error = e
-            continue
-
-    raise RuntimeError(f"All yt-dlp clients failed. Last error: {last_error}")
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
+            return filename
+    except Exception as e:
+        raise RuntimeError(
+            f"yt-dlp download failed: {e}\n"
+            "YouTube blocks downloads from cloud servers. "
+            "Try uploading an audio file directly instead of using a URL."
+        )
 
 
 def convert_to_wav(input_path: str) -> str:
