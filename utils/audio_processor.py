@@ -1,4 +1,5 @@
 import os
+import requests
 import yt_dlp
 from pydub import AudioSegment
 
@@ -8,6 +9,11 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 def download_youtube_audio(url: str) -> str:
     output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
+
+    try:
+        return _download_via_cobalt(url)
+    except Exception as cobalt_err:
+        print(f"Cobalt API failed: {cobalt_err}, trying yt-dlp...")
 
     ydl_opts = {
         "format": "bestaudio/best",
@@ -42,10 +48,51 @@ def download_youtube_audio(url: str) -> str:
             return filename
     except Exception as e:
         raise RuntimeError(
-            f"yt-dlp download failed: {e}\n"
-            "YouTube blocks downloads from cloud servers. "
-            "Try uploading an audio file directly instead of using a URL."
+            f"Download failed: {e}\n"
+            "YouTube blocks downloads from cloud servers."
         )
+
+
+def _download_via_cobalt(url: str) -> str:
+    cobalt_url = "https://api.cobalt.tools/"
+
+    resp = requests.post(
+        cobalt_url,
+        json={
+            "url": url,
+            "downloadMode": "audio",
+            "audioFormat": "wav",
+        },
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        timeout=60,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    if "error" in data:
+        raise RuntimeError(f"Cobalt error: {data['error'].get('code', data['error'])}")
+
+    download_url = data.get("url")
+    if not download_url:
+        raise RuntimeError("Cobalt returned no download URL")
+
+    filename = os.path.join(DOWNLOAD_DIR, f"cobalt_audio_{hash(url) % 100000}.wav")
+
+    dl_resp = requests.get(download_url, stream=True, timeout=120)
+    dl_resp.raise_for_status()
+
+    with open(filename, "wb") as f:
+        for chunk in dl_resp.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    converted = os.path.splitext(filename)[0] + ".wav"
+    if filename != converted:
+        os.rename(filename, converted)
+
+    return converted
 
 
 def convert_to_wav(input_path: str) -> str:
