@@ -1,9 +1,10 @@
+import traceback
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import traceback
+
 import main
 from core.rag_engine import ask_question
 
@@ -18,15 +19,12 @@ app.add_middleware(
 )
 
 # Store rag_chain and video title state for active chat session
-session_data = {
-    "rag_chain": None,
-    "video_title": None
-}
+session_data = {"rag_chain": None, "video_title": None}
 
 
 class ProcessRequest(BaseModel):
     source: str
-    language: str = "english"
+    language: str = "en"  # Changed default from "english" to "en"
 
 
 class ChatRequest(BaseModel):
@@ -86,4 +84,5 @@ async def serve_index():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("api:app", host="127.0.0.1", port=8000, reload=True)

@@ -7,10 +7,11 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 
 def download_youtube_audio(url: str) -> str:
-    output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
+    # Using %(id)s avoids illegal Windows filename characters from video titles
+    output_path = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
 
     ydl_opts = {
-        "format": "bestaudio/best",
+        "format": "m4a/bestaudio/best",
         "outtmpl": output_path,
         "postprocessors": [
             {
@@ -19,8 +20,29 @@ def download_youtube_audio(url: str) -> str:
                 "preferredquality": "192",
             }
         ],
-        "quiet": True,
-        "js_runtimes": {"nodejs": {}},
+        "quiet": False,
+        # Dict format required by yt-dlp Python API for js_runtimes
+        "js_runtimes": {
+            "node": {},
+            "deno": {},
+        },
+        # Client overrides to bypass YouTube's HTTP 403 Forbidden checks
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["ios", "android", "mweb"],
+                "skip": ["hls", "dash"],
+            }
+        },
+        # Modern desktop headers
+        "http_headers": {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/122.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+        "nocheckcertificate": True,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:

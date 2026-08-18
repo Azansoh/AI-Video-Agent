@@ -5,6 +5,32 @@ WHISPER_MODEL = os.getenv("WHISPER_MODEL", "tiny")
 
 _model = None
 
+# Common language map to prevent invalid code crashes
+LANGUAGE_MAPPING = {
+    "english": "en",
+    "hindi": "hi",
+    "spanish": "es",
+    "french": "fr",
+    "german": "de",
+    "chinese": "zh",
+    "japanese": "ja",
+    "korean": "ko",
+    "arabic": "ar",
+    "russian": "ru",
+    "portuguese": "pt",
+    "italian": "it",
+    "urdu": "ur",
+    "bengali": "bn",
+}
+
+
+def normalize_language(lang: str):
+    """Converts full language names or auto-detection flags into ISO codes."""
+    if not lang or lang.lower().strip() in ["auto", "none", "detect", ""]:
+        return None
+    lang_clean = lang.lower().strip()
+    return LANGUAGE_MAPPING.get(lang_clean, lang_clean)
+
 
 def load_model():
     global _model
@@ -22,11 +48,12 @@ def transcribe_chunk(
 ) -> str:
     model = load_model()
 
-    task = "translate" if translate else "transcribe"
+    # Normalize language string to 2-letter code (or None)
+    lang_code = normalize_language(language)
 
     kwargs = {}
-    if language:
-        kwargs["language"] = language
+    if lang_code:
+        kwargs["language"] = lang_code
     if translate:
         kwargs["task"] = "translate"
 
@@ -34,6 +61,7 @@ def transcribe_chunk(
     text = " ".join(segment.text for segment in segments)
 
     return text
+
 
 def transcribe_all(
     chunks: list, language: str = None, translate: bool = False
