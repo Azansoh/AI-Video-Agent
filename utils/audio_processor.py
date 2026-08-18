@@ -20,6 +20,7 @@ def download_youtube_audio(url: str) -> str:
             }
         ],
         "quiet": True,
+        "js_runtimes": ["nodejs"],
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
